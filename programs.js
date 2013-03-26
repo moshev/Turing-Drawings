@@ -201,7 +201,7 @@ function asmgenerate(program)
     var table     = program.table;
     var after = mapWidth * mapHeight;
     var logMapWidth = perfectLog2(mapWidth);
-    var logNumSymbols = Math.ceil(log2(numSymbols));
+    var logNumSymbols = Math.ceil(log2(program.numSymbols));
 
     var code = "";
     code += "function goober(stdlib, foreign, heap) {\n";
