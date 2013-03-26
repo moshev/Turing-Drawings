@@ -185,8 +185,9 @@ function updateRender()
 
     // Produce the image data
     var data = canvas.imgData.data;
-    var map = program.map;
-    for (var i = 0; i < map.length; ++i)
+    var map = program.heap;
+    var length = program.mapWidth * program.mapHeight;
+    for (var i = 0; i < length; ++i)
     {
         var sy = map[i];
 
@@ -201,7 +202,7 @@ function updateRender()
     }
 
     assert (
-        program.map.length * 4 === data.length,
+        length * 4 === data.length,
         'invalid image data length'
     );
 
