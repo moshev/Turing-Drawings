@@ -174,11 +174,6 @@ Program.prototype.update = function (numItrs)
     this.update = function(numItrs) {
         this.reallyUpdate(numItrs);
         this.itrCount += numItrs;
-        // Surely there's a better way:
-        this.map = [];
-        var n = this.mapWidth * this.mapHeight;
-        for (var i = 0; i < n; ++i)
-            this.map.push(this.heap[i]);
     };
     this.update(numItrs);
 }
