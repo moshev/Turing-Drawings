@@ -122,6 +122,8 @@ Program.prototype.reset = function ()
     // Initialize the image, state, and location
     for (var i = 0; i < this.heap.length; ++i)
         this.heap[i] = 0;
+    this.heap[this.mapWidth*this.mapHeight+1] = this.mapWidth/2;  // x position
+    this.heap[this.mapWidth*this.mapHeight+2] = this.mapHeight/2; // y position
 }
 
 Program.prototype.toString = function ()

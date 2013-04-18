@@ -150,7 +150,19 @@ var UPDATE_TIME = 20;
 /**
 Maximum iterations per update
 */
-var UPDATE_ITRS = 250000;
+var speeds = [1, 3, 10, 33, 100, 333, 1000, 3333, 10000, 33333, 100000, 350000, 1000000, 3500000];
+var speed = 10; //speeds.length - 1;
+var UPDATE_ITRS = speeds[speed];
+
+function slower() {
+    if (0 < speed) --speed;
+    UPDATE_ITRS = speeds[speed];
+}
+
+function faster() {
+    if (speed+1 < speeds.length) ++speed;
+    UPDATE_ITRS = speeds[speed];
+}
 
 /**
 Update the rendering
@@ -164,7 +176,7 @@ function updateRender()
     for (;;)
     {
         // Update the program
-        program.update(50000);
+        program.update(Math.min(UPDATE_ITRS, 50000));
 
         var curTime = (new Date()).getTime();
         var curItrc = program.itrCount;
@@ -205,6 +217,30 @@ function updateRender()
         length * 4 === data.length,
         'invalid image data length'
     );
+
+    if (speeds[speed] <= 1000)
+    {
+        // Draw a ring around the Turing machine head.
+        var cx = map[length+1];
+        var cy = map[length+2];
+        for (var j = -9; j <= 9; ++j)
+        {
+            for (var k = -9; k <= 9; ++k)
+            {
+                var r = j*j + k*k;
+                if (13 < r && r < 77)
+                {
+                    var x = (cx + j) & (program.mapWidth - 1);
+                    var y = (cy + k) & (program.mapHeight - 1);
+                    var at = program.mapWidth * y + x;
+                    // Show the ring's pixels by almost-reversing their colors.
+                    data[4 * at + 0] ^= 255;
+                    data[4 * at + 1] ^= 255;
+                    data[4 * at + 2] ^= 63;
+                }
+            }
+        }
+    }
 
     // Show the image data
     canvas.ctx.putImageData(canvas.imgData, 0, 0);
