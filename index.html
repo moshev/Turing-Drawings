@@ -54,8 +54,8 @@
                     <div style="margin-top:8px; margin-bottom:8px;">
                         <button type="button" onclick="randomProg();">Random</button>
                         <button type="button" onclick="restartProg();">Restart</button>
-                        <button type="button" onclick="slower();">Slower</button>
-                        <button type="button" onclick="faster();">Faster</button>
+                        <button type="button" id="slower" onclick="bumpSpeed(-1);">Slower</button>
+                        <button type="button" id="faster" onclick="bumpSpeed(+1);">Faster</button>
                     </div>
 
                     <div style="margin-top:16px; margin-bottom:16px; width:400px; text-align: justify;">
@@ -106,8 +106,8 @@
           interprets the Turing machine; this code compiles it to <a
           href="http://asmjs.org/">asm.js</a>. 
 
-          (I also added the Slower/Faster buttons and the 'lens'
-          around the machine's head that appears at slow .)
+          (I also added the Slower/Faster buttons and the ring
+          around the machine's head visible at slow speeds.)
           
           <p>Some timings on my laptop (a ThinkPad X1 Carbon running
           Firefox Nightly (2013 March) and Chrome 26, on Windows 7)

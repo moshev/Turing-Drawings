@@ -151,16 +151,14 @@ var UPDATE_TIME = 20;
 Maximum iterations per update
 */
 var speeds = [1, 3, 10, 33, 100, 333, 1000, 3333, 10000, 33333, 100000, 350000, 1000000, 3500000];
-var speed = 10; //speeds.length - 1;
+var speed = 10;
 var UPDATE_ITRS = speeds[speed];
 
-function slower() {
-    if (0 < speed) --speed;
-    UPDATE_ITRS = speeds[speed];
-}
+function bumpSpeed(offset) {
+    speed = Math.max(0, Math.min(speed + offset, speeds.length-1));
+    document.getElementById("slower").disabled = (speed === 0);
+    document.getElementById("faster").disabled = (speed === speeds.length-1);
 
-function faster() {
-    if (speed+1 < speeds.length) ++speed;
     UPDATE_ITRS = speeds[speed];
 }
 
