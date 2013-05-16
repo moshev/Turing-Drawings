@@ -87,7 +87,7 @@ function Program(numStates, numSymbols, mapWidth, mapHeight)
                 st,
                 sy,
                 randomInt(0, numStates - 1),
-                randomInt(1, numSymbols - 1),
+                randomInt(0, numSymbols - 1),
                 randomInt(0, NUM_ACTIONS - 1)
             );
         }
@@ -122,8 +122,11 @@ Program.prototype.reset = function ()
     // Initialize the image, state, and location
     for (var i = 0; i < this.heap.length; ++i)
         this.heap[i] = 0;
-    this.heap[this.mapWidth*this.mapHeight+1] = this.mapWidth/2;  // x position
-    this.heap[this.mapWidth*this.mapHeight+2] = this.mapHeight/2; // y position
+	var after = this.mapWidth*this.mapHeight;
+    this.heap[after+1] = this.mapWidth/2;  // x position
+    this.heap[after+2] = this.mapHeight/2; // y position
+    this.heap[after+3] = 1; // movement left
+    this.heap[after+4] = 1; // movement down
 }
 
 Program.prototype.toString = function ()
@@ -199,6 +202,9 @@ function asmgenerate(program)
     var after = mapWidth * mapHeight;
     var logMapWidth = perfectLog2(mapWidth);
     var logNumSymbols = Math.ceil(log2(program.numSymbols));
+	// replace '\0' with - or +
+	var xMovetemplate = "            xPos = (xPos \0 dLeft)|0; if ((xPos|0) >= "+mapWidth+" || (xPos|0) < 0) { dLeft = (-dLeft)|0; xPos = (xPos \0 dLeft \0 dLeft)|0; }\n";
+	var yMovetemplate = "            yPos = (yPos \0 dDown)|0; if ((yPos|0) >= "+mapHeight+" || (yPos|0) < 0) { dDown = (-dDown)|0; yPos = (yPos \0 dDown \0 dDown)|0; }\n";
 
     var code = "";
     code += "function goober(stdlib, foreign, heap) {\n";
@@ -215,6 +221,8 @@ function asmgenerate(program)
     code += "    state = heap32["+((after+0)<<2)+">>2]|0;\n";
     code += "    xPos  = heap32["+((after+1)<<2)+">>2]|0;\n";
     code += "    yPos  = heap32["+((after+2)<<2)+">>2]|0;\n";
+	code += "    dLeft = heap32["+((after+3)<<2)+">>2]|0;\n";
+	code += "    dDown = heap32["+((after+4)<<2)+">>2]|0;\n";
 
     code += "    for (i = numItrs; 0 < (i|0); i = (i - 1)|0) {\n";
     code += "        oldPos = (((yPos<<"+logMapWidth+") + xPos)<<2)|0;\n";
@@ -232,16 +240,16 @@ function asmgenerate(program)
             switch (next.act)
             {
             case ACTION_LEFT:
-                code += "            xPos = (xPos + 1)|0; if ((xPos|0) >= "+mapWidth+") xPos = (xPos - "+mapWidth+")|0;\n";
+                code += xMovetemplate.replace('\0', '+', 'g');
                 break;
             case ACTION_RIGHT:
-                code += "            xPos = (xPos - 1)|0; if ((xPos|0) < 0) xPos = (xPos + "+mapWidth+")|0;\n";
+				code += xMovetemplate.replace('\0', '-', 'g');
                 break;
             case ACTION_UP:
-                code += "            yPos = (yPos - 1)|0; if ((yPos|0) < 0) yPos = (yPos + "+mapHeight+")|0;\n";
+                code += yMovetemplate.replace('\0', '-', 'g');
                 break;
             case ACTION_DOWN:
-                code += "            yPos = (yPos + 1)|0; if ((yPos|0) >= "+mapHeight+") yPos = (yPos - "+mapHeight+")|0;\n";
+                code += yMovetemplate.replace('\0', '+', 'g');
                 break;
             default:
                 error('invalid action');
@@ -254,9 +262,11 @@ function asmgenerate(program)
     code += "    heap32["+((after+0)<<2)+">>2] = state;\n";
     code += "    heap32["+((after+1)<<2)+">>2] = xPos;\n";
     code += "    heap32["+((after+2)<<2)+">>2] = yPos;\n";
+	code += "    heap32["+((after+3)<<2)+">>2] = dLeft;\n";
+	code += "    heap32["+((after+4)<<2)+">>2] = dDown;\n";
     code += "}\n";
     code += "return update;\n";
     code += "}\n";
-//    console.log(code);
+    //console.log(code);
     return code;
 }
