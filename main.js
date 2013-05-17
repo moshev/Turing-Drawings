@@ -47,8 +47,8 @@ function init()
     canvas = document.getElementById("canvas");
 
     // Set the canvas size
-    canvas.width = 128;
-    canvas.height = 128;
+    canvas.width = 1024;
+    canvas.height = 1024;
 
     // Get a 2D context for the drawing canvas
     canvas.ctx = canvas.getContext("2d");
@@ -151,7 +151,7 @@ var UPDATE_TIME = 20;
 Maximum iterations per update
 */
 var speeds = [1, 3, 10, 33, 100, 333, 1000, 3333, 10000, 33333, 100000, 350000, 1000000, 3500000];
-var speed = 1;
+var speed = 10;
 var UPDATE_ITRS = speeds[speed];
 
 function bumpSpeed(offset) {

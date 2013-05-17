@@ -250,7 +250,7 @@ function asmgenerate(program)
 	code += "        var i = 0, j = 0, start = 0, a = 0, b = 0;\n";
 	code += "        for (j = 0; j < "+mapHeight+"; j++) {\n";
 	code += "            start = (j << "+logMapWidth+")|0;\n";
-	code += "            for (i = (dx > 0 ? 0 : ("+mapWidth+"+ dx)|0); (dx > 0 ? ((i|0) < "+mapWidth+"-dx) : ((i|0) > -dx)); i = (i+di)|0) {\n";
+	code += "            for (i = (dx > 0 ? 0 : ("+mapWidth+" - 1)|0); (dx > 0 ? ((i|0) < "+mapWidth+"-dx) : ((i|0) >= -dx)); i = (i+di)|0) {\n";
 	code += "                a = ((start + i) << 2)|0;\n";
 	code += "                b = ((start + i + dx) << 2)|0;\n";
 	code += "                heap32[a >> 2] = heap32[b >> 2];\n";
@@ -265,7 +265,7 @@ function asmgenerate(program)
 	code += "        dy = (+dy)|0;\n";
 	code += "        var i = 0, j = 0, to = 0, from = 0;\n";
 	code += "        var dj = (dy > 0 ? 1:-1)|0;\n";
-	code += "        for (j = (dy > 0 ? 0 : ("+mapWidth+"+dy)|0); (dy > 0 ? ((j|0) < "+mapHeight+"):((j|0) > -dy)); j = (j+dj)|0) {\n";
+	code += "        for (j = (dy > 0 ? 0 : ("+mapWidth+" - 1)|0); (dy > 0 ? ((j|0) < "+mapHeight+"):((j|0) >= -dy)); j = (j+dj)|0) {\n";
 	code += "            to = (j * "+mapWidth+")|0;\n";
 	code += "            from = (to + dy * "+mapWidth+")|0;\n";
 	code += "            for (i = 0; i < "+mapWidth+"; i++) {\n";
