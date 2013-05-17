@@ -34,11 +34,12 @@
 *
 *****************************************************************************/
 
-var ACTION_LEFT  = 0;
-var ACTION_RIGHT = 1;
-var ACTION_UP    = 2;
-var ACTION_DOWN  = 3;
-var NUM_ACTIONS  = 4;
+var ACTION_STAY  = 0;
+var ACTION_LEFT  = 1;
+var ACTION_RIGHT = 2;
+var ACTION_UP    = 3;
+var ACTION_DOWN  = 4;
+var NUM_ACTIONS  = 5;
 
 /*
 N states, one start state
@@ -174,13 +175,20 @@ Program.prototype.update = function (numItrs)
 {
     // N.B. If you ever mutate this.table, mapWidth, mapHeight, then
     // also delete this.update so it'll get regenerated here.
-    eval(asmgenerate(this))
-    this.reallyUpdate = goober(window, null, this.heap.buffer);
-    this.update = function(numItrs) {
-        this.reallyUpdate(numItrs);
-        this.itrCount += numItrs;
-    };
-    this.update(numItrs);
+	var code = asmgenerate(this);
+	try {
+	    eval(code);
+	    this.reallyUpdate = goober(window, null, this.heap.buffer);
+	    this.update = function(numItrs) {
+	        this.reallyUpdate(numItrs);
+	        this.itrCount += numItrs;
+	    };
+	    this.update(numItrs);
+	} catch (e) {
+		this.update = function(){};
+		console.log(code);
+		throw e;
+	}
 }
 
 function perfectLog2(n) {
@@ -203,13 +211,74 @@ function asmgenerate(program)
     var logMapWidth = perfectLog2(mapWidth);
     var logNumSymbols = Math.ceil(log2(program.numSymbols));
 	// replace '\0' with - or +
-	var xMovetemplate = "            xPos = (xPos \0 dLeft)|0; if ((xPos|0) >= "+mapWidth+" || (xPos|0) < 0) { dLeft = (-dLeft)|0; xPos = (xPos \0 dLeft \0 dLeft)|0; }\n";
-	var yMovetemplate = "            yPos = (yPos \0 dDown)|0; if ((yPos|0) >= "+mapHeight+" || (yPos|0) < 0) { dDown = (-dDown)|0; yPos = (yPos \0 dDown \0 dDown)|0; }\n";
+	// bounce
+	var xMovetemplate1 = "            xPos = (xPos \0 dLeft)|0; if ((xPos|0) >= "+mapWidth+" || (xPos|0) < 0) { dLeft = (-dLeft)|0; xPos = (xPos \0 dLeft \0 dLeft)|0; }\n";
+	var yMovetemplate1 = "            yPos = (yPos \0 dDown)|0; if ((yPos|0) >= "+mapHeight+" || (yPos|0) < 0) { dDown = (-dDown)|0; yPos = (yPos \0 dDown \0 dDown)|0; }\n";
+	// teleport
+	var xMovetemplate2 = "            xPos = (xPos \0 dLeft)|0; if ((xPos|0) >= "+mapWidth+" || (xPos|0) < 0) { xPos = (xPos - (\0 "+mapWidth+"))|0; }\n";
+	var yMovetemplate2 = "            yPos = (yPos \0 dDown)|0; if ((yPos|0) >= "+mapHeight+" || (yPos|0) < 0) { yPos = (yPos - (\0 "+mapHeight+"))|0; }\n";
+	// roll
+	var xMovetemplate3 =
+		"            xPos = (xPos \0 dLeft)|0;\n"+
+		"            if ((xPos|0) >= "+mapWidth+") {\n"+
+		"                xPos = ("+mapWidth+" - 1)|0;\n"+
+		"                rollX(1);\n"+
+		"            } else if ((xPos|0) < 0) {\n"+
+		"                xPos = 0;\n"+
+		"                rollX(-1);\n"+
+		"            }\n";
+	var yMovetemplate3 =
+		"            yPos = (yPos \0 dDown)|0;\n"+
+		"            if ((yPos|0) >= "+mapHeight+") {\n"+
+		"                yPos = ("+mapHeight+" - 1)|0;\n"+
+		"                rollY(1);\n"+
+		"            } else if ((yPos|0) < 0) {\n"+
+		"                yPos = 0;\n"+
+		"                rollY(-1);\n"+
+		"            }\n";
+
+	var xMovetemplate = xMovetemplate3;
+	var yMovetemplate = yMovetemplate3;
 
     var code = "";
     code += "function goober(stdlib, foreign, heap) {\n";
     code += '"use asm";\n';
     code += "var heap32 = new stdlib.Int32Array(heap);\n";
+	code += "    function rollX(dx) {\n";
+	code += "        dx = (+dx)|0;\n";
+	code += "        var di = dx > 0 ? 1:-1;\n";
+	code += "        var i = 0, j = 0, start = 0, a = 0, b = 0;\n";
+	code += "        for (j = 0; j < "+mapHeight+"; j++) {\n";
+	code += "            start = (j << "+logMapWidth+")|0;\n";
+	code += "            for (i = (dx > 0 ? 0 : ("+mapWidth+"+ dx)|0); (dx > 0 ? ((i|0) < "+mapWidth+"-dx) : ((i|0) > -dx)); i = (i+di)|0) {\n";
+	code += "                a = ((start + i) << 2)|0;\n";
+	code += "                b = ((start + i + dx) << 2)|0;\n";
+	code += "                heap32[a >> 2] = heap32[b >> 2];\n";
+	code += "            }\n";
+	code += "            for (i = (dx > 0 ? ("+mapWidth+" - dx)|0 : 0); i < (dx > 0 ? "+mapWidth+": -dx); i++) {\n";
+	code += "                a = ((start + i) << 2)|0;\n";
+	code += "                heap32[a >> 2] = 0;\n";
+	code += "            }\n";
+	code += "        }\n";
+	code += "    }\n";
+	code += "    function rollY(dy) {\n";
+	code += "        dy = (+dy)|0;\n";
+	code += "        var i = 0, j = 0, to = 0, from = 0;\n";
+	code += "        var dj = (dy > 0 ? 1:-1)|0;\n";
+	code += "        for (j = (dy > 0 ? 0 : ("+mapWidth+"+dy)|0); (dy > 0 ? ((j|0) < "+mapHeight+"):((j|0) > -dy)); j = (j+dj)|0) {\n";
+	code += "            to = (j * "+mapWidth+")|0;\n";
+	code += "            from = (to + dy * "+mapWidth+")|0;\n";
+	code += "            for (i = 0; i < "+mapWidth+"; i++) {\n";
+	code += "                heap32[(to + i)|0] = heap32[(from + i)|0];\n";
+	code += "            }\n";
+	code += "        }\n";
+	code += "        for (j = (dy > 0 ? ("+mapHeight+" - dy)|0 : 0); j < (dy > 0 ? "+mapHeight+" : -dy); j++) {\n";
+	code += "            to = (j * "+mapWidth+")|0;\n";
+	code += "            for (i = 0; i < "+mapWidth+"; i++) {\n";
+	code += "                heap32[(to + i)|0] = 0;\n";
+	code += "            }\n";
+	code += "        }\n";
+	code += "    }\n";
     code += "function update(numItrs) {\n";
     code += "    numItrs = numItrs|0;\n";
     code += "    var state = 0;\n";
@@ -239,11 +308,13 @@ function asmgenerate(program)
                 code += "            heap32[oldPos>>2] = "+next.symbol+";\n";
             switch (next.act)
             {
+			case ACTION_STAY:
+				break;
             case ACTION_LEFT:
-                code += xMovetemplate.replace('\0', '+', 'g');
+                code += xMovetemplate.replace('\0', '-', 'g');
                 break;
             case ACTION_RIGHT:
-				code += xMovetemplate.replace('\0', '-', 'g');
+				code += xMovetemplate.replace('\0', '+', 'g');
                 break;
             case ACTION_UP:
                 code += yMovetemplate.replace('\0', '-', 'g');
@@ -267,6 +338,5 @@ function asmgenerate(program)
     code += "}\n";
     code += "return update;\n";
     code += "}\n";
-    //console.log(code);
     return code;
 }
