@@ -34,12 +34,12 @@
 *
 *****************************************************************************/
 
-var ACTION_STAY  = 0;
-var ACTION_LEFT  = 1;
-var ACTION_RIGHT = 2;
-var ACTION_UP    = 3;
-var ACTION_DOWN  = 4;
-var NUM_ACTIONS  = 5;
+var ACTION_LEFT  = 0;
+var ACTION_RIGHT = 1;
+var ACTION_UP    = 2;
+var ACTION_DOWN  = 3;
+var ACTION_STAY  = 4;
+var NUM_ACTIONS  = 4;
 
 /*
 N states, one start state
@@ -237,8 +237,8 @@ function asmgenerate(program)
 		"                rollY(-1);\n"+
 		"            }\n";
 
-	var xMovetemplate = xMovetemplate3;
-	var yMovetemplate = yMovetemplate3;
+	var xMovetemplate = xMovetemplate1;
+	var yMovetemplate = yMovetemplate1;
 
     var code = "";
     code += "function goober(stdlib, foreign, heap) {\n";
