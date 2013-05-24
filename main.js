@@ -47,8 +47,8 @@ function init()
     canvas = document.getElementById("canvas");
 
     // Set the canvas size
-    canvas.width = 1024;
-    canvas.height = 1024;
+    canvas.width = 256;
+    canvas.height = 256;
 
     // Get a 2D context for the drawing canvas
     canvas.ctx = canvas.getContext("2d");

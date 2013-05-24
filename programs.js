@@ -250,9 +250,20 @@ function asmgenerate(program)
         "            } else if ((yPos|0) < 0) {\n"+
         "                yPos = 0;\n"+
         "            }\n";
+    var xMovetemplate5 = 
+        "            xPos = (xPos \0 dLeft)|0;\n"+
+        "            if ((xPos|0) >= "+mapWidth+" || (xPos|0) < 0) {\n"+
+        "                xPos = "+mapWidth/2+";\n"+
+        "            }\n";
+    var yMovetemplate5 =
+        "            yPos = (yPos \0 dDown)|0;\n"+
+        "            if ((yPos|0) >= "+mapHeight+" || (yPos|0) < 0) {\n"+
+        "                yPos = "+mapHeight/2+";\n"+
+        "            }\n";
 
-    var xMovetemplate = xMovetemplate4;
-    var yMovetemplate = yMovetemplate4;
+
+    var xMovetemplate = xMovetemplate2;
+    var yMovetemplate = yMovetemplate2;
 
     var code = "";
     code += "function goober(stdlib, foreign, heap) {\n";
