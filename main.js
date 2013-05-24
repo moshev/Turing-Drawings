@@ -90,8 +90,8 @@ function randomProg()
     var numSymbols = parseInt(document.getElementById("numSymbols").value);
 
     assert (
-        numSymbols <= colorMap.length,
-        colorMap.length + ' states currently supported'
+        numSymbols <= colorMap.length / 3,
+        (colorMap.length / 3) + ' states currently supported'
     );
 
     console.log('num states: ' + numStates);
@@ -226,7 +226,7 @@ function updateRender()
             for (var k = -9; k <= 9; ++k)
             {
                 var r = j*j + k*k;
-                if (13 < r && r < 77)
+                if (3 < r && r < 77)
                 {
                     var x = (cx + j) & (program.mapWidth - 1);
                     var y = (cy + k) & (program.mapHeight - 1);

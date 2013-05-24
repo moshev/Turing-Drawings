@@ -75,7 +75,7 @@ function Program(numStates, numSymbols, mapWidth, mapHeight)
     ///   2D tape in the first mapWidth*mapHeight cells; then
     ///   state, xPos, yPos
     /// (size is * 2 instead of + 3 to keep it a power of 2 as asm.js requires)
-    this.heap = new Int32Array(mapWidth * mapHeight * 2); 
+    this.heap = new Int8Array(mapWidth * mapHeight * 2); 
     assert((mapWidth & (mapWidth-1)) === 0, "must be a power of 2");
     assert((mapHeight & (mapHeight-1)) === 0, "must be a power of 2");
 
@@ -158,6 +158,11 @@ Program.fromString = function (str, mapWidth, mapHeight)
         'invalid input string'
     );
 
+	assert(
+		numStates < 256 && numSymbols < 7,
+		'too many states or symbols'
+	);
+
     var prog = new Program(numStates, numSymbols, mapWidth, mapHeight);
 
     assert (
@@ -175,18 +180,16 @@ Program.prototype.update = function (numItrs)
 {
     // N.B. If you ever mutate this.table, mapWidth, mapHeight, then
     // also delete this.update so it'll get regenerated here.
-    var code = asmgenerate(this);
     try {
-        eval(code);
-        this.reallyUpdate = goober(window, null, this.heap.buffer);
+        this.reallyUpdate = makemachine(window, null, this.heap.buffer);
         this.update = function(numItrs) {
-            this.reallyUpdate(numItrs);
+            this.reallyUpdate(this.mapWidth, this.mapHeight,
+					this.numStates, this.numSymbols, numItrs);
             this.itrCount += numItrs;
         };
         this.update(numItrs);
     } catch (e) {
         this.update = function(){};
-        console.log(code);
         throw e;
     }
 }
@@ -201,8 +204,113 @@ function log2(n) {
     return Math.log(n) / Math.log(2);
 }
 
+var makemachine = function(stdlib, foreign, heap) {
+	"use asm";
+	var dLeft = 1|0;
+	var dDown = 1|0;
+	var xPos = 0|0;
+	var yPos = 0|0;
+	var heap8 = new stdlib.Int8Array(heap);
+	// dx, dy in a flat array
+	var actions = new stdlib.Int32Array(NUM_ACTIONS * 2);
+	actions[ACTION_LEFT + 0] = -1;
+	actions[ACTION_LEFT + 1] = 0;
+	actions[ACTION_RIGHT + 2] = 1;
+	actions[ACTION_RIGHT + 3] = 0;
+	actions[ACTION_UP + 4] = 0
+	actions[ACTION_UP + 5] = -1;
+	actions[ACTION_DOWN + 6] = 0;
+	actions[ACTION_DOWN + 7] = 1;
+	function move_bounce(dx, dy, w, h) {
+		w = w|0;
+		h = h|0;
+		dx = dx|0;
+		dy = dy|0;
+		xPos += dx * dLeft;
+		yPos += dy * dDown;
+		if (xPos >= w || xPos < 0) {
+			dLeft = -dLeft;
+			xPos += 2 * dx * dLeft;
+		}
+		if (yPos >= h || yPos < 0) {
+			dDown = -dDown;
+			yPos += 2 * dy * yPos;
+		}
+	}
+	function move_teleport(dx, dy, w, h) {
+		w = w|0;
+		h = h|0;
+		dx = dx|0;
+		dy = dy|0;
+		xPos += dx * dLeft;
+		yPos += dy * dDown;
+		if (xPos >= w || xPos < 0) {
+			xPos -= dx * w;
+		}
+		if (yPos >= h || yPos < 0) {
+			yPos -= dy * h;
+		}
+	}
+	var move = move_teleport;
+	function writeint32(offset, i) {
+		offset = offset|0;
+		i = i|0;
+		heap8[offset] = (i >> 24) & 0xFF;
+		heap8[offset + 1] = (i >> 16) & 0xFF;
+		heap8[offset + 2] = (i >> 8) & 0xFF;
+		heap8[offset + 3] = i & 0xFF;
+	}
+	function readint32(offset) {
+		return ((heap8[offset] << 24) |
+				(heap8[offset + 1] << 16) |
+				(heap8[offset + 2] << 8) |
+				heap8[offset + 3])|0;
+	}
+	function ilog2(n) {
+		n = n|0;
+		n = (n - 1)|0;
+		n = n | (n >> 1);
+		n = n | (n >> 2);
+		n = n | (n >> 4);
+		n = n | (n >> 8);
+		n = n | (n >> 16);
+		n = (n + 1)|0;
+		n = n >> 1;
+		return n|0;
+	}
+	function update(w, h, nst, nsy, niter) {
+		w = w|0;
+		h = h|0;
+		nst = nst|0;
+		nsy = nsy|0;
+		niter = niter|0;
+		var after = (w * h)|0;
+		var state = 0;
+		var log2w = 0;
+		var log2nsy = 0;
+		var symbol = 0;
+		state = readint32(after);
+        xPos = readint32(after + 4);
+        yPos = readint32(after + 8);
+        dLeft = readint32(after + 12);
+        dDown = readint32(after + 16);
+        for (i = niter; 0 < (i|0); i = (i - 1)|0) {
+            oldPos = (yPos * w + xPos)|0;
+			symbol = heap8[oldPos]|0;
+			
+		}
+		writeint32(after, state);
+        writeint32(after + 4, xPos);
+        writeint32(after + 8, yPos);
+        writeint32(after + 12, dLeft);
+        writeint32(after + 16, dDown);
+	}
+	return update;
+}
+
 function asmgenerate(program)
 {
+	return null;
     var mapWidth  = program.mapWidth;
     var mapHeight = program.mapHeight;
     var numStates = program.numStates;
@@ -251,8 +359,8 @@ function asmgenerate(program)
         "                yPos = 0;\n"+
         "            }\n";
 
-    var xMovetemplate = xMovetemplate4;
-    var yMovetemplate = yMovetemplate4;
+    var xMovetemplate = xMovetemplate1;
+    var yMovetemplate = yMovetemplate1;
 
     var code = "";
     code += "function goober(stdlib, foreign, heap) {\n";
