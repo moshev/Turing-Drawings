@@ -70,8 +70,13 @@ function Program(numStates, numSymbols, mapWidth, mapHeight)
     /// Transition table
     this.table = new Int32Array(numStates * numSymbols * 3);
 
-    /// Map (2D tape)
-    this.map = new Int32Array(mapWidth * mapHeight); 
+    /// Machine state:
+    ///   2D tape in the first mapWidth*mapHeight cells; then
+    ///   state, xPos, yPos
+    /// (size is * 2 instead of + 3 to keep it a power of 2 as asm.js requires)
+    this.heap = new Int32Array(mapWidth * mapHeight * 2); 
+    assert((mapWidth & (mapWidth-1)) === 0, "must be a power of 2");
+    assert((mapHeight & (mapHeight-1)) === 0, "must be a power of 2");
 
     // Generate random transitions
     for (var st = 0; st < numStates; ++st)
@@ -90,6 +95,17 @@ function Program(numStates, numSymbols, mapWidth, mapHeight)
 
     // Initialize the state
     this.reset();
+}
+
+Program.prototype.mutate = function() {
+	this.setTrans(
+		Math.floor(Math.random()*this.numStates),
+		Math.floor(Math.random()*this.numSymbols),
+		randomInt(0, this.numStates - 1),
+		randomInt(1, this.numSymbols - 1),
+		randomInt(0, NUM_ACTIONS - 1)
+	);
+	this.reset();
 }
 
 Program.prototype.setTrans = function (st0, sy0, st1, sy1, ac1)
@@ -111,19 +127,14 @@ Program.prototype.getTrans = function (st0, sy0)
 
 Program.prototype.reset = function ()
 {
-    /// Start state
-    this.state = 0;
-
-    /// Top-left corner
-    this.xPos = 0;
-    this.yPos = 0;
-
     /// Iteration count
     this.itrCount = 0;
 
-    // Initialize the image
-    for (var i = 0; i < this.map.length; ++i)
-        this.map[i] = 0;
+    // Initialize the image, state, and location
+    for (var i = 0; i < this.heap.length; ++i)
+        this.heap[i] = 0;
+    this.heap[this.mapWidth*this.mapHeight+1] = this.mapWidth/2;  // x position
+    this.heap[this.mapWidth*this.mapHeight+2] = this.mapHeight/2; // y position
 }
 
 Program.prototype.toString = function ()
@@ -171,50 +182,77 @@ Program.prototype.update = function (numItrs)
 {
     // N.B. If you ever mutate this.table, mapWidth, mapHeight, then
     // also delete this.update so it'll get regenerated here.
-    this.update = eval(generate(this));
-    return this.update(numItrs);
+    eval(asmgenerate(this))
+    this.reallyUpdate = goober(window, null, this.heap.buffer);
+    this.update = function(numItrs) {
+        this.reallyUpdate(numItrs);
+        this.itrCount += numItrs;
+    };
+    this.update(numItrs);
 }
 
-function generate(program)
+function perfectLog2(n) {
+    var result = log2(n);
+    assert(result === (result|0), "must be a power of 2");
+    return result;
+}
+
+function log2(n) {
+    return Math.log(n) / Math.log(2);
+}
+
+function asmgenerate(program)
 {
     var mapWidth  = program.mapWidth;
     var mapHeight = program.mapHeight;
     var numStates = program.numStates;
     var table     = program.table;
+    var after = mapWidth * mapHeight;
+    var logMapWidth = perfectLog2(mapWidth);
+    var logNumSymbols = Math.ceil(log2(program.numSymbols));
 
     var code = "";
-    code += "(function(numItrs) {\n";
-    code += "    var map = this.map;\n";
-    code += "    var state = this.state;\n";
-    code += "    var xPos = this.xPos;\n";
-    code += "    var yPos = this.yPos;\n";
-    code += "    for (var i = numItrs; 0 < i; --i) {\n";
-    code += "        var oldPos = "+mapWidth+" * yPos + xPos;\n";
-    code += "        switch ("+numStates+" * map[oldPos] + state) {\n";
-    for (var symbol = 0; symbol < program.numSymbols; ++symbol)
+    code += "function goober(stdlib, foreign, heap) {\n";
+    code += '"use asm";\n';
+    code += "var heap32 = new stdlib.Int32Array(heap);\n";
+    code += "function update(numItrs) {\n";
+    code += "    numItrs = numItrs|0;\n";
+    code += "    var state = 0;\n";
+    code += "    var xPos  = 0;\n";
+    code += "    var yPos  = 0;\n";
+    code += "    var i     = 0;\n";
+    code += "    var oldPos = 0;\n";
+
+    code += "    state = heap32["+((after+0)<<2)+">>2]|0;\n";
+    code += "    xPos  = heap32["+((after+1)<<2)+">>2]|0;\n";
+    code += "    yPos  = heap32["+((after+2)<<2)+">>2]|0;\n";
+
+    code += "    for (i = numItrs; 0 < (i|0); i = (i - 1)|0) {\n";
+    code += "        oldPos = (((yPos<<"+logMapWidth+") + xPos)<<2)|0;\n";
+    code += "        switch (((heap32[oldPos>>2]|0) + (state<<"+logNumSymbols+"))|0) {\n";
+    for (var state = 0; state < numStates; ++state)
     {
-        for (var state = 0; state < numStates; ++state)
-        {
-            var idx = numStates * symbol + state;
+        for (var symbol = 0; symbol < program.numSymbols; ++symbol)
+        {   
             var next = program.getTrans(state, symbol);
-            code += "        case "+idx+":\n";
+            code += "        case "+(symbol + (state << logNumSymbols))+":\n";
             if (next.state !== state)
                 code += "            state = "+next.state+";\n";
             if (next.symbol !== symbol)
-                code += "            map[oldPos] = "+next.symbol+";\n";
+                code += "            heap32[oldPos>>2] = "+next.symbol+";\n";
             switch (next.act)
             {
             case ACTION_LEFT:
-                code += "            xPos += 1; if (xPos >= "+mapWidth+") xPos -= "+mapWidth+";\n";
+                code += "            xPos = (xPos + 1)|0; if ((xPos|0) >= "+mapWidth+") xPos = (xPos - "+mapWidth+")|0;\n";
                 break;
             case ACTION_RIGHT:
-                code += "            xPos -= 1; if (xPos < 0) xPos += "+mapWidth+";\n";
+                code += "            xPos = (xPos - 1)|0; if ((xPos|0) < 0) xPos = (xPos + "+mapWidth+")|0;\n";
                 break;
             case ACTION_UP:
-                code += "            yPos -= 1; if (yPos < 0) yPos += "+mapHeight+";\n";
+                code += "            yPos = (yPos - 1)|0; if ((yPos|0) < 0) yPos = (yPos + "+mapHeight+")|0;\n";
                 break;
             case ACTION_DOWN:
-                code += "            yPos += 1; if (yPos >= "+mapHeight+") yPos -= "+mapHeight+";\n";
+                code += "            yPos = (yPos + 1)|0; if ((yPos|0) >= "+mapHeight+") yPos = (yPos - "+mapHeight+")|0;\n";
                 break;
             default:
                 error('invalid action');
@@ -224,10 +262,12 @@ function generate(program)
     }
     code += "        }\n";
     code += "    }\n";
-    code += "    this.state = state;\n";
-    code += "    this.xPos = xPos;\n";
-    code += "    this.yPos = yPos;\n";
-    code += "    this.itrCount += numItrs;\n";
-    code += "})";
+    code += "    heap32["+((after+0)<<2)+">>2] = state;\n";
+    code += "    heap32["+((after+1)<<2)+">>2] = xPos;\n";
+    code += "    heap32["+((after+2)<<2)+">>2] = yPos;\n";
+    code += "}\n";
+    code += "return update;\n";
+    code += "}\n";
+//    console.log(code);
     return code;
 }

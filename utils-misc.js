@@ -329,4 +329,3 @@ function resample(data, numSamples, outLow, outHigh, inLow, inHigh)
     // Return the normalized samples
     return samples;
 }
-

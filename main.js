@@ -38,6 +38,17 @@
 // Page interface code
 //============================================================================
 
+var schedule =
+    (   window.requestAnimationFrame
+     || window.webkitRequestAnimationFrame
+     || window.mozRequestAnimationFrame
+     || function (callback) { setTimeout(callback, UPDATE_TIME); });
+
+var running = false;
+
+var progHist = new Array();
+var hInd = 0;
+
 /**
 Called after page load to initialize needed resources
 */
@@ -74,10 +85,7 @@ function init()
     }
 
     // Set the update function to be called regularly
-    updateInterv = setInterval(
-        updateRender,
-        UPDATE_TIME
-    );
+    run();
 }
 window.addEventListener("load", init, false);
 
@@ -107,6 +115,90 @@ function randomProg()
 
     // Clear the current hash tag to avoid confusion
     location.hash = '';
+	
+	//add the program to program history
+	hInd = progHist.length;
+	progHist[hInd] = program.toString();
+	hInd++;
+
+    run();
+}
+
+function mutateProg() {
+	hInd = progHist.length;
+	progHist[hInd] = program.toString();
+	hInd++;
+	program.mutate();
+	program = Program.fromString(
+		program.toString(),
+		canvas.width,
+		canvas.height
+	);
+	run();
+	
+    // Set the sharing URL
+    var str = program.toString();
+    var url = location.protocol + '//' + location.host + location.pathname;
+    var shareURL = url + '#' + str;
+    document.getElementById("shareURL").value = shareURL;
+}
+function revert() {
+	progHist.pop();
+	if (hInd > 0) hInd--;
+	program = Program.fromString(
+		progHist[hInd-1],
+		canvas.width,
+		canvas.height
+	);
+	run();
+	
+    // Set the sharing URL
+    var str = program.toString();
+    var url = location.protocol + '//' + location.host + location.pathname;
+    var shareURL = url + '#' + str;
+    document.getElementById("shareURL").value = shareURL;
+}
+function forward() {
+	if (hInd < progHist.length) hInd++;
+	program = Program.fromString(
+		progHist[hInd-1],
+		canvas.width,
+		canvas.height
+	);
+	
+    // Set the sharing URL
+    var str = program.toString();
+    var url = location.protocol + '//' + location.host + location.pathname;
+    var shareURL = url + '#' + str;
+    document.getElementById("shareURL").value = shareURL;
+}
+
+function recombine() {
+	var str1 = document.getElementById("parent1").value.split("#")[1].split(",");
+	var str2 = document.getElementById("parent2").value.split("#")[1].split(",");
+	var str3 = "";
+	str3 += str1[0] > str2[0] ? str1[0] : str2[0];
+	str3 += ",";
+	str3 += str1[1] > str2[1] ? str1[1] : str2[1];
+	str3 += ",";
+	var ind = 2;
+	for (ind; ind<str1.length && ind<str2.length; ind++) {
+		if (Math.random()<.5) str3 += str1[ind];
+		else str3 += str2[ind];
+		if (ind<str1.length-1 && ind<str2.length-1) str3 += ",";
+	}
+	program = Program.fromString(
+		str3,
+		canvas.width,
+		canvas.height
+	);
+	
+    // Set the sharing URL
+    var str = program.toString();
+    var url = location.protocol + '//' + location.host + location.pathname;
+    var shareURL = url + '#' + str;
+    document.getElementById("shareURL").value = shareURL;
+	run();
 }
 
 /**
@@ -115,6 +207,16 @@ Reset the program state
 function restartProg()
 {
     program.reset();
+    run();
+}
+
+function pauseOrPlay() {
+    if (running) {
+        running = false;
+        document.getElementById("pause").innerHTML = "Play";
+    }
+    else
+        run();
 }
 
 // Default console logging function implementation
@@ -136,7 +238,7 @@ var colorMap = [
     0  ,0  ,0  ,    // Black
     255,255,255,    // White
     0  ,255,0  ,    // Green
-    0, ,0, ,255,    // Blue
+    0  ,0  ,255,    // Blue
     255,255,0  ,
     0  ,255,255,
     255,0  ,255,
@@ -145,12 +247,29 @@ var colorMap = [
 /***
 Time per update, in milliseconds
 */
-var UPDATE_TIME = 40;
+var UPDATE_TIME = 20;
 
 /**
 Maximum iterations per update
 */
-var UPDATE_ITRS = 350000;
+var speeds = [1, 3, 10, 33, 100, 333, 1000, 3333, 10000, 33333, 100000, 350000, 1000000, 3500000];
+var speed = 10;
+var UPDATE_ITRS = speeds[speed];
+
+function bumpSpeed(offset) {
+    speed = Math.max(0, Math.min(speed + offset, speeds.length-1));
+    document.getElementById("slower").disabled = (speed === 0);
+    document.getElementById("faster").disabled = (speed === speeds.length-1);
+
+    UPDATE_ITRS = speeds[speed];
+    run();
+}
+
+function run() {
+    if (!running) schedule(updateRender);
+    running = true;
+    document.getElementById("pause").innerHTML = "Pause";
+}
 
 /**
 Update the rendering
@@ -164,7 +283,7 @@ function updateRender()
     for (;;)
     {
         // Update the program
-        program.update(5000);
+        program.update(Math.min(UPDATE_ITRS, 50000));
 
         var curTime = (new Date()).getTime();
         var curItrc = program.itrCount;
@@ -185,8 +304,9 @@ function updateRender()
 
     // Produce the image data
     var data = canvas.imgData.data;
-    var map = program.map;
-    for (var i = 0; i < map.length; ++i)
+    var map = program.heap;
+    var length = program.mapWidth * program.mapHeight;
+    for (var i = 0; i < length; ++i)
     {
         var sy = map[i];
 
@@ -201,11 +321,37 @@ function updateRender()
     }
 
     assert (
-        program.map.length * 4 === data.length,
+        length * 4 === data.length,
         'invalid image data length'
     );
 
+    if (speeds[speed] <= 1000)
+    {
+        // Draw a ring around the Turing machine head.
+        var cx = map[length+1];
+        var cy = map[length+2];
+        for (var j = -9; j <= 9; ++j)
+        {
+            for (var k = -9; k <= 9; ++k)
+            {
+                var r = j*j + k*k;
+                if (13 < r && r < 77)
+                {
+                    var x = (cx + j) & (program.mapWidth - 1);
+                    var y = (cy + k) & (program.mapHeight - 1);
+                    var at = program.mapWidth * y + x;
+                    // Show the ring's pixels by almost-reversing their colors.
+                    data[4 * at + 0] ^= 255;
+                    data[4 * at + 1] ^= 255;
+                    data[4 * at + 2] ^= 63;
+                }
+            }
+        }
+    }
+
     // Show the image data
     canvas.ctx.putImageData(canvas.imgData, 0, 0);
-}
 
+    // Repeat
+    if (running) schedule(updateRender);
+}

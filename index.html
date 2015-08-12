@@ -1,3 +1,4 @@
+
 <html>
     <head>
 
@@ -54,20 +55,11 @@
                     <div style="margin-top:8px; margin-bottom:8px;">
                         <button type="button" onclick="randomProg();">Random</button>
                         <button type="button" onclick="restartProg();">Restart</button>
-                    </div>
-
-                    <div style="margin-top:16px; margin-bottom:16px; width:400px; text-align: justify;">
-                    Turing Drawings uses randomly generated Turing machines to produce
-                    drawings on a canvas, as a form of generative art. The typical
-                    Turing machine formulation manipulates symbols on a one-dimensional
-                    tape. Turing Drawings uses machines that operate on a finite 2D grid,
-                    where each grid cell can contain one symbol which corresponds to a
-                    color value. This 2D grid is represented in the canvas shown at the left,
-                    which is dynamically updated as the Turing machine iterates.
-                    <br><br>
-                    You can generate new drawings by pressing the "Random" button above. If
-                    you find a drawing you like, and would like to share it online, you can
-                    do so by copying the custom URL shown in the text area below.
+                        <button type="button" onclick="mutateProg();">Mutate</button>
+                        <br>
+                        <button type="button" id="faster" onclick="bumpSpeed(+1);">Faster</button>
+                        <button type="button" id="slower" onclick="bumpSpeed(-1);">Slower</button>
+                        <button type="button" id="pause" onclick="pauseOrPlay();">Pause</button>
                     </div>
 
                     <div style="margin-top:8px; margin-bottom:8px;">
@@ -75,9 +67,28 @@
                         Shareable URL for this drawing:
                         </div>
                         <div>
-                        <input id="shareURL" type="text" size="42" value="" readonly>
+                        <input id="shareURL" type="text" size="42" value="">
                         </div>
                     </div>
+					
+					<div style="margin-top:16px; margin-bottom:16px; width:400px; text-align: justify;">
+					Genetic Recombination of URLs:
+					</div>
+					
+					<div style="margin-top:8px; margin-bottom:8px;">
+                        <div>
+                        Parent 1:
+                        <input id="parent1" type="text" size="42" value="">
+                        </div>
+                    </div>
+					<div style="margin-top:8px; margin-bottom:8px;">
+                        <div>
+                        Parent 2:
+                        <input id="parent2" type="text" size="42" value="">
+                        </div>
+                    </div>
+                       
+					<button type="button" id="pause" onclick="recombine();">Generate Child</button>
 
                 </form>
             </td>
@@ -87,7 +98,7 @@
         </div>
 
         <div class="copyright">
-        Copyright &copy; 2012 Maxime Chevalier-Boisvert
+        <a href="http://wry.me/hacking/Turing-Drawings/">Based on...</a>
         </div>
 
     </body>
